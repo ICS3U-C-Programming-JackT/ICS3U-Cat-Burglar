@@ -1,4 +1,3 @@
-
 # Level layout: '1-9' = wall, '0' = empty, 's' = start, 'e' = end
 # 1 = Default, 2 = Pillar, 3 = Window, 4 = Secondary Colour, 8 = Locked Door, 9 = Elevator
 # Due to how I set up scan algorithm, map aspect ratio MUST BE 1:1
@@ -35,3 +34,4 @@ BORDER_LEFT = 0
 BORDER_RIGHT = 144
 
 STEP_SFX_DELAY = 0.5
+MUSIC_DELAY = 27

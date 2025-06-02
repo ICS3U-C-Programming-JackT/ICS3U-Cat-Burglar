@@ -10,8 +10,10 @@ import constants
 timer = 60
 moving = False
 
+
 class Color(object):
     """Standard colors"""
+
     WHITE = 0xFFFFFF
     BLACK = 0x000000
     RED = 0xFF0000
@@ -27,10 +29,11 @@ class Color(object):
     def __init__(self):
         return self
 
-class player():
-    def __init__(self,resolution,refresh,speed,turn):
+
+class player:
+    def __init__(self, resolution, refresh, speed, turn):
         # Core stats
-        self._fg_bitmap = displayio.Bitmap(5,5,5)
+        self._fg_bitmap = displayio.Bitmap(5, 5, 5)
         self.resolution = resolution
         self.refresh = refresh
         self.speed = speed
@@ -39,11 +42,13 @@ class player():
         self.fov = 70
         self.current_map = constants.LEVELS[0]
 
-    def scan(self,origin_x,origin_y,direction):
+    def scan(self, origin_x, origin_y, direction):
         rays = []
         for ray_index in range(self.resolution):
             # Calculate offset for each ray based on its angle relative to FOV
-            ray_offset_deg = (ray_index - self.resolution / 2) * (self.fov / self.resolution)
+            ray_offset_deg = (ray_index - self.resolution / 2) * (
+                self.fov / self.resolution
+            )
             ray_angle = math.radians(direction + ray_offset_deg)
 
             # Direction vector of the ray
@@ -55,8 +60,8 @@ class player():
             map_y = int(origin_y)
 
             # Distance from one side of a grid cell to the next
-            delta_dist_x = abs(1 / ray_dir_x) if ray_dir_x != 0 else float('inf')
-            delta_dist_y = abs(1 / ray_dir_y) if ray_dir_y != 0 else float('inf')
+            delta_dist_x = abs(1 / ray_dir_x) if ray_dir_x != 0 else float("inf")
+            delta_dist_y = abs(1 / ray_dir_y) if ray_dir_y != 0 else float("inf")
 
             # Setup step direction and initial distance to first side
             if ray_dir_x < 0:
@@ -76,7 +81,9 @@ class player():
             distance = 0
             wall_hit = False
             wall_type = ""
-            side_hit = 0  # 0 = hit x-side (vertical wall), 1 = hit y-side (horizontal wall)
+            side_hit = (
+                0  # 0 = hit x-side (vertical wall), 1 = hit y-side (horizontal wall)
+            )
 
             # Perform DDA (Digital Differential Analyzer) stepping
             while not wall_hit and distance < self.max_dist:
@@ -91,7 +98,9 @@ class player():
                     side_hit = 1
 
                 # Bounds check before accessing the map
-                if 0 <= map_x < len(self.current_map[0]) and 0 <= map_y < len(self.current_map):
+                if 0 <= map_x < len(self.current_map[0]) and 0 <= map_y < len(
+                    self.current_map
+                ):
                     if self.current_map[map_y][map_x] == 1:
                         wall_hit = True
                         wall_type = "vertical" if side_hit == 0 else "horizontal"
@@ -108,38 +117,43 @@ class player():
                 hit_pos_x = origin_x + ray_dir_x * distance
                 hit_pos_y = origin_y + ray_dir_y * distance
 
-                rays.append({
-                    "x": hit_pos_x,
-                    "y": hit_pos_y,
-                    "distance": distance,
-                    "wall": wall_type
-                })
+                rays.append(
+                    {
+                        "x": hit_pos_x,
+                        "y": hit_pos_y,
+                        "distance": distance,
+                        "wall": wall_type,
+                    }
+                )
 
         return rays
+
 
 def game_start(player_data):
 
     background_image = stage.Bank.from_bmp16("background.bmp")
     image_bank_sprites = stage.Bank.from_bmp16("core_icons.bmp")
 
-    background = stage.Grid(background_image,10,8)
-    timer_icon = stage.Sprite(image_bank_sprites,4,10,10)
-    temp_icon = stage.Sprite(image_bank_sprites,13,15,15)
+    background = stage.Grid(background_image, 10, 8)
+    timer_icon = stage.Sprite(image_bank_sprites, 4, 10, 10)
+    temp_icon = stage.Sprite(image_bank_sprites, 13, 15, 15)
 
     game = stage.Stage(ugame.display, 60)
-    
+
     # Finalize layers
     game.layers = [timer_icon, temp_icon, background]
     game.render_block()
 
-    last_step_sound = time.monotonic()
+    last_step_sound = 0
+    last_music_played = 0
 
-    # Step sound
-    step_sound = open("step_sound.wav","rb")
+    # Sounds
+    music_sound = open("Burglar.wav", "rb")
+    step_sound = open("step_sound.wav", "rb")
     sound = ugame.audio
     sound.stop()
     sound.mute(False)
-    
+
     # Game loop
     while True:
 
@@ -161,44 +175,52 @@ def game_start(player_data):
         if keys & ugame.K_SELECT:
             print("Select")
         if keys & ugame.K_RIGHT:
-            temp_icon.move(temp_icon.x+1,temp_icon.y)
-            if temp_icon.x>=constants.BORDER_RIGHT:
-                temp_icon.move(temp_icon.x-1,temp_icon.y)
+            temp_icon.move(temp_icon.x + 1, temp_icon.y)
+            if temp_icon.x >= constants.BORDER_RIGHT:
+                temp_icon.move(temp_icon.x - 1, temp_icon.y)
         if keys & ugame.K_LEFT:
-            temp_icon.move(temp_icon.x-1,temp_icon.y)
-            if temp_icon.x<=constants.BORDER_LEFT:
-                temp_icon.move(temp_icon.x+1,temp_icon.y)
+            temp_icon.move(temp_icon.x - 1, temp_icon.y)
+            if temp_icon.x <= constants.BORDER_LEFT:
+                temp_icon.move(temp_icon.x + 1, temp_icon.y)
         if keys & ugame.K_UP:
-            temp_icon.move(temp_icon.x,temp_icon.y-1)
-            if temp_icon.y<=0:
-                temp_icon.move(temp_icon.x,127)
+            temp_icon.move(temp_icon.x, temp_icon.y - 1)
+            if temp_icon.y <= 0:
+                temp_icon.move(temp_icon.x, 127)
         if keys & ugame.K_DOWN:
-            temp_icon.move(temp_icon.x,temp_icon.y+1)
-            if temp_icon.y>=128:
-                temp_icon.move(temp_icon.x,0)
-                
-        #Check if player is moving
+            temp_icon.move(temp_icon.x, temp_icon.y + 1)
+            if temp_icon.y >= 128:
+                temp_icon.move(temp_icon.x, 0)
+
+        # Check if player is moving
         if keys & (ugame.K_UP | ugame.K_DOWN | ugame.K_LEFT | ugame.K_RIGHT):
             moving = True
         else:
             moving = False
 
+        # Music
+        if time.monotonic() - last_music_played > constants.MUSIC_DELAY:
+            sound.play(music_sound, loop=True)
+            last_music_played = time.monotonic()
+
         # Step sfx
-        if time.monotonic() - last_step_sound > constants.STEP_SFX_DELAY and moving == True:
-            sound.play(step_sound)
+        if (
+            time.monotonic() - last_step_sound > constants.STEP_SFX_DELAY
+            and moving == True
+        ):
+            sound.play(step_sound, loop=False)
             last_step_sound = time.monotonic()
         elif not moving:
             sound.stop()
-        if time.monotonic()-int(time.monotonic())<.1:
-            timer_icon.set_frame(rotation=random.randint(1,7))
+
+        if time.monotonic() - int(time.monotonic()) < 0.1:
+            timer_icon.set_frame(rotation=random.randint(1, 7))
         else:
             timer_icon.set_frame(rotation=0)
-        
 
 
 def open_program():
-    player_data = player(16,5,1,90)
-    
+    player_data = player(16, 5, 1, 90)
+
     while True:
         keys = ugame.buttons.get_pressed()
         if keys & ugame.K_SELECT:
