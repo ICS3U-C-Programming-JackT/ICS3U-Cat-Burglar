@@ -1,11 +1,12 @@
-import time
 import math
 import random
 
+import time
+
+import constants
+import displayio
 import stage
 import ugame
-import displayio
-import constants
 
 timer = 60
 moving = False
@@ -207,10 +208,11 @@ def game_start(player_data):
             time.monotonic() - last_step_sound > constants.STEP_SFX_DELAY
             and moving == True
         ):
-            sound.play(step_sound, loop=False)
+            # sound.play(step_sound, loop=False)
             last_step_sound = time.monotonic()
         elif not moving:
-            sound.stop()
+            pass
+            # sound.stop()
 
         if time.monotonic() - int(time.monotonic()) < 0.1:
             timer_icon.set_frame(rotation=random.randint(1, 7))
