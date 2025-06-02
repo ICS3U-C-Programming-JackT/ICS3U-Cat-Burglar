@@ -1,5 +1,6 @@
 import math
 import random
+
 import time
 
 import constants
@@ -220,28 +221,27 @@ def game_start(player_data):
 
 
 def open_program():
-    player_data = player(16, 5, 1, 90)
+    player_data = player(
+        16, 5, 1, 90
+    )  # Ensure this function/class is defined elsewhere
     game = stage.Stage(ugame.display, 60)
+
+    # Load all image banks once
+    image_banks = [
+        stage.Bank.from_bmp16(filename) for filename in constants.BMP_FILENAMES
+    ]
 
     background_sprites = []
 
-    for strip_index, bank in enumerate(constants.BMP_FILENAMES):
-        strip_start_x_pixel = (
-            strip_index * constants.TILE_SIZE
-        )  # X position for this vertical strip
-        for y_tile_index_in_bank in range(
-            SCREEN_HEIGHT_PX // constants.TILE_SIZE
-        ):  # Iterate for 8 tiles high
-            tile_start_y_pixel = (
-                y_tile_index_in_bank * TILE_SIZE
-            )  # Y position for this specific tile
+    for strip_index, bank in enumerate(image_banks):
+        strip_start_x_pixel = strip_index * 16
+        for y_tile_index_in_bank in range(128 // 16):
+            tile_start_y_pixel = y_tile_index_in_bank * 16
 
-            sprite = stage.Sprite(
-                bank, y_tile_index_in_bank, strip_start_x_pixel, tile_start_y_pixel
-            )
+            sprite = stage.Sprite(bank, 0, strip_start_x_pixel, tile_start_y_pixel)
             background_sprites.append(sprite)
 
-    game.layers = []
+    game.layers = background_sprites
     game.render_block()
 
     while True:
@@ -250,6 +250,7 @@ def open_program():
         keys = ugame.buttons.get_pressed()
         if keys & ugame.K_SELECT:
             break
+
     game_start(player_data)
 
 
