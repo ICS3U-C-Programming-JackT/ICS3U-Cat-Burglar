@@ -156,7 +156,7 @@ def game_start(player_data, current_level):
     timer_icon = stage.Sprite(image_bank_sprites, 4, 10, 10)
 
     # Core game
-    game = stage.Stage(ugame.display, 60)
+    game = stage.Stage(ugame.display, constants.FPS)
     game_start_time = time.monotonic()
     game_running = True
     game_won = True
@@ -315,7 +315,7 @@ def game_start(player_data, current_level):
                             )
                         )
             # Reset game layers to prevent multiple renders overlapping
-            game.layers = new + [timer_icon, background] + timer
+            game.layers = new + timer + [timer_icon, background]
             game.render_block()
             game.render_sprites([timer_icon])
             last_rendered_walls = time.monotonic()
@@ -349,12 +349,25 @@ def game_start(player_data, current_level):
         open_program()
 
 
+def tutorial():
+    print("Tutorial, awaiting user input")
+    game = stage.Stage(ugame.display, constants.FPS)
+
+    while True:
+        game.tick()
+
+        keys = ugame.buttons.get_pressed()
+        if keys & ugame.K_X:
+            print("User ended tutorial! returning to menu")
+            break
+
+
 def open_program():
     # Define player data
     player_data = player(16, 0.5, 0.5, 90)
 
     # Ensure this function/class is defined elsewhere
-    game = stage.Stage(ugame.display, 60)
+    game = stage.Stage(ugame.display, constants.FPS)
 
     # Load all image banks for the title screen background
     image_banks = [
@@ -378,7 +391,6 @@ def open_program():
                 )
                 game.layers.append(sprite)
                 new.append(sprite)
-
     # Create text
     text = []
 
@@ -407,9 +419,11 @@ def open_program():
 
     # Render new background
 
-    game.layers += text
+    game.layers = text + game.layers
 
     game.render_block()
+
+    skip_game_start = False
 
     # Wait until user clicks select to begin the game
     while True:
@@ -418,9 +432,13 @@ def open_program():
         keys = ugame.buttons.get_pressed()
         if keys & ugame.K_SELECT:
             break
+        if keys & ugame.K_X:
+            tutorial()
+            skip_game_start = True
 
-    # Call start function
-    game_start(player_data, 1)
+    if not skip_game_start:
+        # Call start function
+        game_start(player_data, 1)
 
 
 if __name__ == "__main__":

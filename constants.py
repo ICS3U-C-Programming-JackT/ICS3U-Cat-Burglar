@@ -38,6 +38,8 @@ LEVELS = [
     ],
 ]
 
+FPS = 60
+
 # X and Y coordinates for start and end position in levels.
 LEVEL_START = [1, 1]
 LEVEL_END = [8, 7]
