@@ -17,7 +17,7 @@ class player:
         self.refresh = refresh
         self.speed = speed
         self.turn = turn
-        self.max_dist = 6
+        self.max_dist = 2
         self.fov = 70
         self.current_map = constants.LEVELS[0]
 
@@ -151,195 +151,120 @@ def game_start(player_data, current_level):
     image_bank_sprites = stage.Bank.from_bmp16("core_icons.bmp")
     palette_bank = stage.Bank.from_bmp16("palette.bmp")
 
-    # Define core sprites
+    # Background and timer icon
     background = stage.Grid(background_image, 10, 8)
     timer_icon = stage.Sprite(image_bank_sprites, 4, 10, 10)
 
-    # Core game
-    game = stage.Stage(ugame.display, constants.FPS)
-    game_start_time = time.monotonic()
-    game_running = True
-    game_won = True
-
-    # Finalize layers
-    game.layers = [timer_icon, background]
-    game.render_block()
-
-    # Sound-related stuff:
-    last_step_sound = 0
-    last_music_played = 0
-
-    # Render Delay
-    last_rendered_walls = time.monotonic()
-
     # Timer text
-    timer = []
-    text_timer = stage.Text(
-        width=20, height=8, font=None, palette=constants.WHITE_PALETTE, buffer=None
-    )
+    text_timer = stage.Text(width=20, height=8, font=None, palette=constants.RED_PALETTE)
     text_timer.move(15, 10)
     text_timer.text = str(constants.ROUND_LENGTH)
-    timer.append(text_timer)
 
+    timer = [text_timer]
+
+    # Create reusable wall sprites (2 per ray)
+    wall_sprites = []
+    for _ in range(player_data.resolution * 2):
+        sprite = stage.Sprite(palette_bank, 0, 0, 0)  # default values
+        wall_sprites.append(sprite)
+
+    # Add to layers
+    game = stage.Stage(ugame.display, constants.FPS)
+    game.layers = wall_sprites + timer + [timer_icon, background]
+    game.render_block()
+
+    # Init player
     player_data.x = constants.LEVEL_START[0]
     player_data.y = constants.LEVEL_START[1]
 
-    # Game loop
+    game_start_time = time.monotonic()
+    last_rendered_walls = game_start_time
+    last_music_played = game_start_time
+
+    game_running = True
+    game_won = True
+
     while game_running:
-
-        # Render sprites, tick
-        game.render_sprites([timer_icon])
         game.tick()
-
-        # Define Keys
         keys = ugame.buttons.get_pressed()
 
-        # Get keys pressed for movement
+        # Rotation
         if keys & ugame.K_X:
             player_data.rotation -= 1
         if keys & ugame.K_O:
             player_data.rotation += 1
-        if keys & ugame.K_START:
-            print("Start")
-        if keys & ugame.K_SELECT:
-            print("Select")
 
-        if keys & ugame.K_RIGHT:
-            rotation_radians = radians(player_data.rotation - 90)
-            move_step_x = math.cos(rotation_radians) / 50
-            move_step_y = math.sin(rotation_radians) / 50
-            player_data.x += move_step_x
-            player_data.y += move_step_y
-        if keys & ugame.K_LEFT:
-            rotation_radians = radians(player_data.rotation + 90)
-            move_step_x = math.cos(rotation_radians) / 50
-            move_step_y = math.sin(rotation_radians) / 50
-            player_data.x += move_step_x
-            player_data.y += move_step_y
+        # Movement
+        rotation_rad = radians(player_data.rotation)
         if keys & ugame.K_UP:
-            rotation_radians = radians(player_data.rotation)
-            move_step_x = math.cos(rotation_radians) / 50
-            move_step_y = math.sin(rotation_radians) / 50
-            player_data.x += move_step_x
-            player_data.y += move_step_y
+            player_data.x += math.cos(rotation_rad) / 50
+            player_data.y += math.sin(rotation_rad) / 50
         if keys & ugame.K_DOWN:
-            rotation_radians = radians(player_data.rotation + 180)
-            move_step_x = math.cos(rotation_radians) / 50
-            move_step_y = math.sin(rotation_radians) / 50
-            player_data.x += move_step_x
-            player_data.y += move_step_y
-
-        # Check if player is moving
-        if keys & (ugame.K_UP | ugame.K_DOWN | ugame.K_LEFT | ugame.K_RIGHT):
-            moving = True
-        else:
-            moving = False
+            player_data.x -= math.cos(rotation_rad) / 50
+            player_data.y -= math.sin(rotation_rad) / 50
+        if keys & ugame.K_LEFT:
+            strafe_rad = radians(player_data.rotation + 90)
+            player_data.x += math.cos(strafe_rad) / 50
+            player_data.y += math.sin(strafe_rad) / 50
+        if keys & ugame.K_RIGHT:
+            strafe_rad = radians(player_data.rotation - 90)
+            player_data.x += math.cos(strafe_rad) / 50
+            player_data.y += math.sin(strafe_rad) / 50
 
         # Music
-        if time.monotonic() - last_music_played > constants.MUSIC_DELAY:
+        now = time.monotonic()
+        if now - last_music_played > constants.MUSIC_DELAY:
             play_sound("music")
-            last_music_played = time.monotonic()
+            last_music_played = now
 
-        if time.monotonic() - int(time.monotonic()) < 0.1:
+        if now - int(now) < 0.1:
             timer_icon.set_frame(rotation=random.randint(1, 7))
         else:
             timer_icon.set_frame(rotation=0)
 
-        # Check if walls are ready to be updated
-        if time.monotonic() - last_rendered_walls >= player_data.refresh:
+        # Wall rendering
+        if now - last_rendered_walls >= player_data.refresh:
+            scan_data = player_data.scan(player_data.x, player_data.y, player_data.rotation)
+            sprite_idx = 0
 
-            # Get wall sizes and positions
-            scan_data = player.scan(
-                player_data, player_data.x, player_data.y, player_data.rotation
-            )
+            for ray_n, ray in enumerate(scan_data):
+                ray_offset_deg = (ray_n - player_data.resolution / 2) * (player_data.fov / player_data.resolution)
 
-            # Create array to append to game layers
-            new = []
-            for ray_n in range(player_data.resolution):
-
-                # Draw a wall sprite at the top
-                ray = scan_data[ray_n]
-                if ray != None:
-                    ray_offset_deg = (ray_n - player_data.resolution / 2) * (
-                        player_data.fov / player_data.resolution
-                    )
-
-                    # Remove fisheye lens
-                    corrected_dist = ray["distance"] * math.cos(
-                        math.radians(ray_offset_deg)
-                    )
-
-                    # Color of wall if vertical or not
+                if ray:
+                    corrected_dist = ray["distance"] * math.cos(math.radians(ray_offset_deg))
+                    corrected_dist = max(0.1, corrected_dist)
                     palette_index = 1 if ray["wall"] == "vertical" else 5
 
-                    if corrected_dist * 8 > 2:
+                    xpos = 160 - (ray_n * 16)
 
-                        # Triple wall height
-                        for wall_num in range(1, 3):
-                            ypos = 0
-                            if wall_num == 1:
-                                ypos = round(-corrected_dist * 8 + 80)
-                            elif wall_num == 2:
-                                ypos = 80
-                            else:
-                                ypos = round(corrected_dist * 8 + 80)
+                    # Render up to two sprites per ray
+                    for i in range(2):
+                        ypos = round(-corrected_dist * 8 + 80) if i == 0 else round(corrected_dist * 8 + 80)
+                        wall_sprites[sprite_idx].move(xpos, ypos)
+                        wall_sprites[sprite_idx].set_frame(palette_index)
+                        sprite_idx += 1
+                else:
+                    # Move off-screen if no hit
+                    for i in range(2):
+                        wall_sprites[sprite_idx].move(240, 240)
+                        sprite_idx += 1
 
-                            new.append(
-                                stage.Sprite(
-                                    palette_bank, palette_index, ray_n * 16, ypos
-                                )
-                            )
-                    elif corrected_dist >= 1:
+            text_timer.text = str(int(game_start_time - now + constants.ROUND_LENGTH))
+            game.render_sprites(wall_sprites + [timer_icon])
+            last_rendered_walls = now
 
-                        # Double wall height
-                        for wall_num in range(1, 2):
-                            ypos = (
-                                round(-corrected_dist * 8 + 80)
-                                if wall_num == 1
-                                else round(corrected_dist * 8 + 80)
-                            )
-                            new.append(
-                                stage.Sprite(
-                                    palette_bank, palette_index, ray_n * 16, ypos
-                                )
-                            )
-                    else:
-
-                        # Single wall height
-                        new.append(
-                            stage.Sprite(
-                                palette_bank,
-                                palette_index,
-                                ray_n * 16,
-                                round(-corrected_dist * 8 + 80),
-                            )
-                        )
-            # Reset game layers to prevent multiple renders overlapping
-            game.layers = new + timer + [timer_icon, background]
-            game.render_block()
-            game.render_sprites([timer_icon])
-            last_rendered_walls = time.monotonic()
-
-        # Update timer text
-        text_timer.text = str(
-            game_start_time - time.monotonic() + constants.ROUND_LENGTH
-        )
-
-        if time.monotonic() - game_start_time >= constants.ROUND_LENGTH:
+        # Game timer
+        if now - game_start_time >= constants.ROUND_LENGTH:
             game_won = False
             game_running = False
 
-        if check_win(current_level, player_data) == True:
+        if check_win(current_level, player_data):
             game_won = True
             game_running = False
 
-        if not game_running:
-            break
-
     play_sound("stop")
-    # Transition to next stage or quit logic
     if game_won:
-        if current_level + 1 < 3:
+        if current_level + 1 < len(constants.LEVELS):
             game_start(player_data, current_level + 1)
         else:
             print("You won the whole game!")
@@ -347,6 +272,7 @@ def game_start(player_data, current_level):
     else:
         print("Game over!")
         open_program()
+
 
 
 def tutorial():
@@ -364,10 +290,13 @@ def tutorial():
 
 def open_program():
     # Define player data
-    player_data = player(16, 0.5, 0.5, 90)
+    player_data = player(16, .25, 0.5, 90)
 
     # Ensure this function/class is defined elsewhere
     game = stage.Stage(ugame.display, constants.FPS)
+
+    background_image = stage.Bank.from_bmp16("blank.bmp")
+    background = stage.Grid(background_image, 10, 8)
 
     # Load all image banks for the title screen background
     image_banks = [
@@ -375,22 +304,7 @@ def open_program():
     ]
 
     game.layers = []
-    new = []
-    off_x = 17
-    off_y = 40
-
-    # Render each background sprite
-    for x in range(10):
-        for y in range(8):
-            time.sleep(0.0001)
-            # Showing only a portion of the background to reduce glitchy effect
-            if x < 8 and y < 5:
-                sprite_index = y * 10 + x
-                sprite = stage.Sprite(
-                    image_banks[0], sprite_index, x * 16 + off_x, y * 16 + off_y
-                )
-                game.layers.append(sprite)
-                new.append(sprite)
+    
     # Create text
     text = []
 
@@ -416,12 +330,32 @@ def open_program():
     text_srt.move(20, 50)
     text_srt.text = "Press Select to begin"
     text.append(text_srt)
+    
 
     # Render new background
+    
+
+    new = []
+    off_x = 17
+    off_y = 40
+
+    # Render each background sprite
+    for x in range(10):
+        for y in range(8):
+            time.sleep(0.0001)
+            # Showing only a portion of the background to reduce glitchy effect
+            if x < 8 and y < 5:
+                sprite_index = y * 10 + x
+                sprite = stage.Sprite(
+                    image_banks[0], sprite_index, x * 16 + off_x, y * 16 + off_y
+                )
+                game.layers.append(sprite)
+                new.append(sprite)
 
     game.layers = text + game.layers
 
     game.render_block()
+    
 
     skip_game_start = False
 
