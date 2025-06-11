@@ -211,7 +211,7 @@ def victoryScene(lvl):
         width=29, height=12, font=None, palette=constants.WHITE_PALETTE, buffer=None
     )
     text_1.move(0, 0)
-    text_1.text("You won level " + str(lvl))
+    text_1.text("You won level " + str(lvl) if lvl < 1 else "You won the whole game!")
     text.append(text_1)
 
     text_2 = stage.Text(
@@ -365,6 +365,11 @@ def game_start(player_data, current_level):
 
         # Wall rendering
         if now - last_rendered_walls >= player_data.refresh:
+            # Update timer
+            text_timer.clear()
+            t = str(int(constants.ROUND_LENGTH + (game_start_time - now)))
+            text_timer.text(t)
+
             scan_data = player_data.scan(
                 player_data.x, player_data.y, player_data.rotation
             )
@@ -407,9 +412,7 @@ def game_start(player_data, current_level):
                         sprite_idx += 1
             last_rendered_walls = now
 
-        text_timer.clear()
         text_timer.move(25, 10)
-        text_timer.text(str(constants.ROUND_LENGTH + (game_start_time - now)))
 
         game.render_sprites(wall_sprites + [timer_icon])
 
@@ -428,8 +431,8 @@ def game_start(player_data, current_level):
 
     # If won, move onto next level, otherwise restart program
     if game_won:
+        victoryScene(current_level)
         if current_level + 1 < len(constants.LEVELS) - 1:
-            victoryScene(current_level)
             current_level += 1
             game_start(player_data, current_level)
         else:
